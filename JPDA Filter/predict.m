@@ -7,11 +7,16 @@ function [mu_bar, sigma_bar] = predict(mu, sigma, u)
     % Outputs:   
     %           mu_bar(t)         dimStatesXtau             | predicted mean of each target
     %           sigma_bar(t)      dimStatesXdimStatesXtau   | predicted variance of each targetend
-
+    
+    global tau
     global R
     global F
     global G
 
-    mu_bar = F*mu + G*u;
-    sigma_bar = F*sigma*F' + R;
+    mu_bar = zeros(size(mu));
+    sigma_bar = zeros(size(sigma));
+    for t = 1:tau
+        mu_bar(:,t) = F*mu(:,t) + G*u(:,t);
+        sigma_bar(:,:,t) = F*sigma(:,:,t)*F' + R;
+    end
 end

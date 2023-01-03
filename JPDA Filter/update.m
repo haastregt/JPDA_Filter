@@ -20,7 +20,7 @@ function [mu, sigma] = update(mu_bar, sigma_bar, beta, beta_auxillary, nu_bar)
     sigma = zeros(size(sigma_bar));
 
     for t = 1:tau
-        nu_total = 0;
+        nu_total = zeros(size(mu_bar,1),1);
         for j = 1:n_measurements
             nu_total = nu_total + beta(t,j)*nu_bar(:,j,t);
         end

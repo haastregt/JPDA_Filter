@@ -26,7 +26,7 @@ function [nu_bar, beta, beta_auxillary] = associate(z, mu_bar,sigma_bar)
         for j = 1:n_measurements
             nu_bar(:,j,t) = z(:,j) - z_hat;
             S_bar = H*sigma_bar(:,:,t)*H' + Q;
-            d = nu_bar(:,j,t)'*(nu_bar(:,j,t)/S_bar);
+            d = nu_bar(:,j,t)'/S_bar*nu_bar(:,j,t);
             p_association(t,j) = 1/((2*pi)^(size(z,1)/2)*sqrt(det(S_bar)))*exp(-0.5*d);
         end
     end

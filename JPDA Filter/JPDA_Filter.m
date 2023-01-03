@@ -21,12 +21,12 @@ end_time = 100;     % [s] Duration of simulation
 
 %% Initialise
 % Define dynamical model: 1D random walk
-n_states = 1;              % Number of states of the dynamics model.
+n_states = 3;              % Number of states of the dynamics model.
 n_inp    = 1;              % Number of control inputs.
-n_meas   = 1;              % Number of measurements (Dimension of measurement model).
+n_meas   = 3;              % Number of states of a measurement.
 F = eye(n_states);
-G = eye(n_inp);
-H = eye(n_meas);
+G = ones(n_states, n_inp);
+H = eye(n_meas, n_states);
 
 % Set values for JPDA parameters
 R = 0.02*eye(n_states);
@@ -38,12 +38,10 @@ P_FA = 0.1;
 map_size = 6;
 
 % Number of targets
-tau = 2;
+tau = 3;
 
 % Set initial estimate of target states
-mu = zeros(n_states,tau);
-mu(:,1) = -1;
-mu(:,2) = 2;
+mu = map_size*(rand(n_states, tau)-0.5);
 
 % Set initial estimate of covariances. Increase to start with less certainty
 sigma = repmat(1*R,[1,1,tau]);
@@ -62,7 +60,7 @@ mu_store = zeros(n_states,tau,end_time/delta_t);
 %% Run
 for timestep = 1:(end_time/delta_t)
     % Retrieve u (just 0 for now)
-    u = zeros(1,tau);
+    u = zeros(n_inp,tau);
     
     % Simulate dynamical model
     [ground_truth] = simulate_dynamics(ground_truth, u);
