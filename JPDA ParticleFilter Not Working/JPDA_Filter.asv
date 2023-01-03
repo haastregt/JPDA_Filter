@@ -1,0 +1,201 @@
+% This script performs the JPDA filter on 1D data.
+
+% Each target has the same discrete dynamical model x_k+1 = Fx_k + Gu_k
+% and the same measurement model z_k = Hx_k.
+
+%% Parameters
+global F            % F matrix of dynamical model
+global G            % G matrix of dynamical model
+global H            % H matrix of measurement model
+global R            % [ ] Covariance matrix of motion model | dimStates X dimStates
+global Q            % [ ] Covariance matrix of measurement model | dimStates X dimStates
+global tau          % [ ] Number of targets (fixed for now, TODO: can be variable and estimated)
+global P_D          % [ ] Probability of a detection
+global P_FA         % [ ] Probability of a false alarm
+
+delta_t = 0.1;      % [s] Time between simulation steps
+end_time = 100;     % [s] Duration of simulation
+
+% Dynamical model: 1D random walk
+F = 1;
+G = 1;
+H = 1;
+
+dim_states = size(F,1);
+R = 1*eye(dimStates);
+Q = 1*eye(dimStates);
+tau = 2;
+P_D = 0.9;
+P_FA = 0.1;
+
+%% Initialise
+% Set initial estimate of target states
+mu = zeros(dim_states,tau);
+mu(:,1) = -1;
+mu(:,2) = 2;
+
+% Set initial estimate of covariances. Increase to start with less certainty
+sigma = repmat(1*R,[1,1,tau]);
+
+% Sample a ground truth for each target
+ground_truth = zeros(dim_states,tau);
+for t = 1:tau
+    ground_truth(:,t) = mvnrnd(mu(:,t),sigma(:,:,t));
+end
+
+%% Run
+for timestep = 1:(end_time/delta_t)
+    % Retrieve u
+    u = 0;
+    
+    % Simulate dynamical model
+    ground_truth = simulate_dynamics(ground_truth);
+
+    % Simulate measurements
+    [z, association_ground_truth] = simulate_measurements(ground_truth);
+    
+    % Do an iteration of JPDA Filter
+    [mu, sigma] = iterate(mu, sigma, u, z);
+end
+
+%% Visualize results
+% TODO: visualise results
+
+%% Functions for JPDA (move to separate files later)
+function [mu, sigma] = iterate(mu, sigma, u, z)
+    % This function performs one iteration of the JPDA filter.
+    % Inputs:
+    %           mu(t-1)                   dimStates X tau
+    %           sigma(t-1)                dimStates X dimStates X tau
+    %           u                         nInputs X tau
+    %           z                         dimMeasurements X nMeasurements
+    % Outputs:
+    %           mu(t)                     dimStates X tau
+    %           sigma(t)                  dimStates X dimStates X tau
+    
+    global tau
+    global Q
+    global H
+    global P_D
+    global P_FA
+
+    % number of measurements available
+    n_measurements = size(z, 2);
+
+    % predict step
+    [mu_bar, sigma_bar] = predict(mu, sigma, u);
+
+    % associate step
+    % First, compute individual association probabilities
+    p_association = zeros(tau, n_measurements);
+    nu_bar = zeros(size(z,1),n_measurements,tau);
+    for t = 1:tau
+        z_hat = H*mu(:,t);
+        for j = 1:n_measurements
+            nu_bar(:,j,t) = z(:,j) - z_hat;
+            S_bar = H*sigma_bar*H' + Q;
+            d = nu_bar'*(nu_bar\inv(S_bar));
+            p_association(t,j) = 1/((2*pi)^(size(z,1)/2)*sqrt(det(S_bar)))*exp(-0.5*d^2);
+        end
+    end
+    % Now find legal association events containing an association between j
+    % and t to find the marginalized probability of the assocation (beta).
+
+    % Find theta: tau X n_legal_events. For each event
+    % it contains the associated target to each measurement. An
+    % association of 0 means the observation is clutter.
+    [theta] = find_legal_association_events(n_measurements,tau);
+    % Evaluate probability of event given measurements p(theta|Z)
+    
+    probability = ones(size(theta,2));
+    for event = 1:size(theta,2)
+        % amount of clutter measurements in event
+        n_misdetected = 0;
+        for t = 1:tau
+            if theta(t,event) ~= 0
+                probability(event) = probability(event)*p_association(theta(t,event),t);
+            else
+                n_misdetected = n_misdetected + 1;
+            end
+        end
+        probability(event) = probability(event)*P_D^(tau-n_misdetected)*(1-P_D)^n_misdetected*P_FA^(n_measurements-(tau-n_misdetected));
+    end
+    
+    % Now compute marginalised probabilities
+    beta = zeros(tau,n_measurements);
+    beta_auxillary = zeros(tau,1);
+    for t = 1:tau
+        for j = 1:1:n_measurements
+            % Marginalize over association events that contain a t,j association
+            beta(t,j) = sum(probability(theta(j,:) == t));
+        end
+        % Probability that object t was not detected
+        beta_auxillary(t) = 1 - sum(beta(t,:));
+    end
+
+    % update step
+    [mu, sigma] = update(mu_bar, sigma_bar, beta, beta_auxillary, nu_bar);
+
+    % Returen measurement info
+end
+
+function [mu_bar, sigma_bar] = predict(mu, sigma, u)
+    % This function performs the prediction step of the Kalman Filter
+    % Inputs:
+    %           mu(t-1)           dimStatesXtau             | mean of each target
+    %           sigma(t-1)        dimStatesXdimStatesXtau   | variance of each target
+    %           u                 nInputsXtau               | input for each target
+    % Outputs:   
+    %           mu_bar(t)         dimStatesXtau             | predicted mean of each target
+    %           sigma_bar(t)      dimStatesXdimStatesXtau   | predicted variance of each targetend
+
+    global R
+    global F
+    global G
+
+    mu_bar = F*mu + G*u;
+    sigma_bar = F*sigma*F' + R;
+end
+
+function [theta] = find_legal_association_events(n_measurements,tau)
+    % This function finds all legal association events
+    % Inputs:
+    %       n_measurements      scalar               | number of measurements
+    %       tau                 scalar               | number of targets
+    % Outputs:
+    %       theta               tauXn_legal_events   | all possible association events
+
+    % For legal assocations the following conditions must hold:
+    %       1. Each object must be either detected or misdetected
+    %       2. No pair of objects can be associated to the same measurement
+
+    combinations = nchoose
+
+end
+
+function [mu, sigma] = update(mu_bar, sigma_bar, beta, beta_auxillary, nu_bar)
+    % This function performs the update step of the Kalman Filter
+    % Inputs:
+    %           mu_bar(t)       dimStatesXtau                       | predicted mean of each target
+    %           sigma_bar(t)    dimStatesXdimStatesXtau             | predicted variance of each target
+    %           beta            tauXn_measurements                  | complete probability for association
+    %           beta_auxillary  tauX1                               | probability of target not being detected
+    %           nu_bar          dimMeasurementsXtauXn_measurements  | innovation for individual associations
+    % Outputs:
+    %           mu(t)           dimStatesXtau                       | updated mean for each target
+    %           sigma(t)        dimStatesXdimStatesXtau             | updated variance for each target
+    
+    global H
+    global Q
+    
+    nu_total = sum(beta*nu_bar,3);
+    K = sigma_bar*H/(H*sigma_bar*H' + Q);
+
+    mu = mu_bar + K*nu_total;
+
+    P_bar = sigma_bar - K*(H*sigma_bar*H' + Q)*K';
+    P_tilde = K*(sum(beta*(nu_bar*nu_bar'),2) - nu_total*nu_total')*K';
+    sigma = beta_auxillary*sigma_bar + (1-beta_auxillary)*P_bar + P_tilde;
+end
+
+%% Functions for simulation (move to separate files later)
