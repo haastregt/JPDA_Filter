@@ -21,14 +21,16 @@ end_time = 100;     % [s] Duration of simulation
 
 %% Initialise
 % Define dynamical model: 1D random walk
-F = 1;
-G = 1;
-H = 1;
+n_states = 1;              % Number of states of the dynamics model.
+n_inp    = 1;              % Number of control inputs.
+n_meas   = 1;              % Number of measurements (Dimension of measurement model).
+F = eye(n_states);
+G = eye(n_inp);
+H = eye(n_meas);
 
 % Set values for JPDA parameters
-dim_states = size(F,1);
-R = 0.02*eye(dim_states);
-Q = 0.02*eye(dim_states);
+R = 0.02*eye(n_states);
+Q = 0.02*eye(n_meas);
 P_D = 0.9;
 P_FA = 0.1;
 
@@ -39,7 +41,7 @@ map_size = 6;
 tau = 2;
 
 % Set initial estimate of target states
-mu = zeros(dim_states,tau);
+mu = zeros(n_states,tau);
 mu(:,1) = -1;
 mu(:,2) = 2;
 
@@ -47,10 +49,15 @@ mu(:,2) = 2;
 sigma = repmat(1*R,[1,1,tau]);
 
 % Sample a ground truth for each target
-ground_truth = zeros(dim_states,tau);
+ground_truth = zeros(n_states,tau);
 for t = 1:tau
     ground_truth(:,t) = mvnrnd(mu(:,t),sigma(:,:,t));
 end
+
+% Initialize storage variables (Used for visualization purposes)
+timestep_store = zeros(end_time/delta_t,1);
+ground_truth_store = zeros(n_states,tau,end_time/delta_t);
+mu_store = zeros(n_states,tau,end_time/delta_t);
 
 %% Run
 for timestep = 1:(end_time/delta_t)
@@ -65,7 +72,23 @@ for timestep = 1:(end_time/delta_t)
     
     % Do an iteration of JPDA Filter
     [mu, sigma] = iterate(mu, sigma, u, z);
-end
 
+    % Store data for visualization purposes
+    timestep_store(timestep) = timestep*delta_t;
+    ground_truth_store(:,:,timestep) = ground_truth;
+    mu_store(:,:,timestep) = mu;
+end
 %% Visualize results
-% TODO: visualise results
+% Plot ground truth alongside estimated states
+figure(1)
+hold on
+grid on
+
+plot(timestep_store, squeeze( ground_truth_store(1,:,:) ))
+plot(timestep_store, squeeze( mu_store(1,:,:) ))
+
+title('Ground truth')
+xlabel('Time [s]')
+ylabel('Position [m]')
+legend('Target 1','Target 2', 'Estimated Target 1', 'Estimated Target 2')
+
