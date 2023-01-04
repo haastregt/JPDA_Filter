@@ -1,4 +1,4 @@
-function [mu, sigma] = iterate(mu, sigma, u, z)
+function [mu, sigma, beta] = iterate(mu, sigma, u, z)
     % This function performs one iteration of the JPDA filter.
     % Inputs:
     %           mu(t-1)                   dimStates X tau

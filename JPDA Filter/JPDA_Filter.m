@@ -18,12 +18,13 @@ global map_size     % size for the map, centered around the origin | scalar
 
 delta_t = 0.1;      % [s] Time between simulation steps
 end_time = 100;     % [s] Duration of simulation
+n_timesteps = end_time/delta_t + 1;
 
 %% Initialise
-% Define dynamical model: 1D random walk
-n_states = 3;              % Number of states of the dynamics model.
+% Define dynamical model: random walk (can be made more complicated)
+n_states = 1;              % Number of states of the dynamics model.
 n_inp    = 1;              % Number of control inputs.
-n_meas   = 3;              % Number of states of a measurement.
+n_meas   = 1;              % Number of states of a measurement.
 F = eye(n_states);
 G = ones(n_states, n_inp);
 H = eye(n_meas, n_states);
@@ -40,53 +41,58 @@ map_size = 6;
 % Number of targets
 tau = 3;
 
+% Initialise arrays to store each timestep for plotting
+ground_truth = zeros(n_states,tau,n_timesteps);
+mu = zeros(n_states,tau,n_timesteps);
+sigma = zeros(n_states,n_states,tau,n_timesteps);
+% Cell arrays can have variable lengths for each timestep
+z = cell(n_timesteps,1); 
+association_ground_truth = cell(n_timesteps,1);
+
 % Set initial estimate of target states
-mu = map_size*(rand(n_states, tau)-0.5);
+mu(:,:,1) = map_size*(rand(n_states, tau)-0.5);
 
 % Set initial estimate of covariances. Increase to start with less certainty
-sigma = repmat(1*R,[1,1,tau]);
+sigma(:,:,:,1) = repmat(1*R,[1,1,tau]);
 
 % Sample a ground truth for each target
-ground_truth = zeros(n_states,tau);
 for t = 1:tau
-    ground_truth(:,t) = mvnrnd(mu(:,t),sigma(:,:,t));
+    ground_truth(:,t,1) = mvnrnd(mu(:,t,1),sigma(:,:,t,1));
 end
 
-% Initialize storage variables (Used for visualization purposes)
-timestep_store = zeros(end_time/delta_t,1);
-ground_truth_store = zeros(n_states,tau,end_time/delta_t);
-mu_store = zeros(n_states,tau,end_time/delta_t);
-
 %% Run
-for timestep = 1:(end_time/delta_t)
+for timestep = 2:n_timesteps
     % Retrieve u (just 0 for now)
     u = zeros(n_inp,tau);
     
     % Simulate dynamical model
-    [ground_truth] = simulate_dynamics(ground_truth, u);
+    [ground_truth(:,:,timestep)] = simulate_dynamics(ground_truth(:,:,timestep-1), u);
 
     % Simulate measurements
-    [z, association_ground_truth] = simulate_measurements(ground_truth);
+    [z{timestep}, association_ground_truth{timestep}] = simulate_measurements(ground_truth(:,:,timestep));
     
     % Do an iteration of JPDA Filter
-    [mu, sigma] = iterate(mu, sigma, u, z);
+    [mu(:,:,timestep), sigma(:,:,:,timestep)] = iterate(mu(:,:,timestep-1), sigma(:,:,:,timestep-1), u, z{timestep});
 
     % Store data for visualization purposes
-    timestep_store(timestep) = timestep*delta_t;
-    ground_truth_store(:,:,timestep) = ground_truth;
-    mu_store(:,:,timestep) = mu;
+    %timestep_store(timestep) = timestep*delta_t;
+    %ground_truth_store(:,:,timestep) = ground_truth;
+    %mu_store(:,:,timestep) = mu;
 end
+
 %% Visualize results
-% Plot ground truth alongside estimated states
-figure(1)
-hold on
-grid on
+timesteps = 0:delta_t:end_time;
 
-plot(timestep_store, squeeze( ground_truth_store(1,:,:) ))
-plot(timestep_store, squeeze( mu_store(1,:,:) ))
-
-title('Ground truth')
-xlabel('Time [s]')
-ylabel('Position [m]')
-legend('Target 1','Target 2', 'Estimated Target 1', 'Estimated Target 2')
+figure(1), clf(1), hold on
+legendstrings = [];
+for t = 1:tau
+    plot(timesteps,squeeze(ground_truth(1,t,:)))
+    plot(timesteps,squeeze(mu(1,t,:)))
+    legendstrings = [legendstrings, "ground truth target " + num2str(t), "estimate target" + num2str(t)];
+end
+xlabel("Time (s)");
+ylabel("x");
+title("1D random walk with " + num2str(tau) + " targets");
+legend(legendstrings)
+hold off
 
