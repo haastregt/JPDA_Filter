@@ -10,7 +10,7 @@ function [z_hat, invalid] = gnn_associate(z, mu_bar,sigma_bar)
     % Number of available measurements
     n_measurements = size(z,2);
     % gate_threshold = chi2inv(0.99,2); % Threshold for the Mahalanobis distance
-    gate_threshold = 3; % [m] % TODO: This is a temporary value that is used just for debugging purposes
+    gate_threshold = 5; % [m] % TODO: This is a temporary value that is used just for debugging purposes
     invalid = 0;    % Flag to indicate if there are any valid associations by the end of this function
 
     %% Step 1: Compute cost matrix L_ij (i = 1,2,...,targets; j = 1,2,...,measurements)
@@ -37,23 +37,52 @@ function [z_hat, invalid] = gnn_associate(z, mu_bar,sigma_bar)
 
     % 2.1: Compute the cost for all possible combinations of targets with the measurements and misdetections. and choose the one with the lowest cost
     % NOTE: Each observation can only be associated with one target, and each target can only be associated with one observation.
-    % ASSUMPTION: We are assuming that the number of target is 2
     % TODO: Make this code work for any number of targets and potentially implement the Hungarian algorithm if needed
     
     min_total_cost = inf; % Initialize the minimum total cost
     cost = 0;
 
-    for t1 = 1:size(z, 2)
-        for t2 = 1:size(z, 2)
-            if t2 == t1
-                continue
+    if tau == 1
+        for t1 = 1:size(z, 2)
+            new_total_cost = L_ij(1,t1);
+            if new_total_cost < min_total_cost
+                min_total_cost = new_total_cost;
+                theta_1_star = t1;
             end
         end
-        new_total_cost = L_ij(1,t1) + L_ij(2,t2);
-        if new_total_cost < min_total_cost
-            min_total_cost = new_total_cost;
-            theta_1_star = t1;
-            theta_2_star = t2;
+    elseif tau == 2
+        for t1 = 1:size(z, 2)
+            for t2 = 1:size(z, 2)
+                if t2 == t1
+                    continue
+                end
+            end
+            new_total_cost = L_ij(1,t1) + L_ij(2,t2);
+            if new_total_cost < min_total_cost
+                min_total_cost = new_total_cost;
+                theta_1_star = t1;
+                theta_2_star = t2;
+            end
+        end
+    elseif tau == 3
+        for t1 = 1:size(z, 2)
+            for t2 = 1:size(z, 2)
+                if t2 == t1
+                    continue
+                end
+                for t3 = 1:size(z, 2)
+                    if t3 == t1 || t3 == t2
+                        continue
+                    end
+                    new_total_cost = L_ij(1,t1) + L_ij(2,t2) + L_ij(3,t3);
+                    if new_total_cost < min_total_cost
+                        min_total_cost = new_total_cost;
+                        theta_1_star = t1;
+                        theta_2_star = t2;
+                        theta_3_star = t3;
+                    end
+                end
+            end
         end
     end
 
@@ -71,17 +100,41 @@ function [z_hat, invalid] = gnn_associate(z, mu_bar,sigma_bar)
     % If theta^*i = j != 0, then A_ij = 1
     % If theta^*i = 0, then A_i,m+i = 1
 
-    if theta_1_star ~= 0
-        A_ij(1,theta_1_star) = 1;
-    else
-        A_ij(1,n_measurements+1) = 1;
+    if tau == 1
+        if theta_1_star ~= 0
+            A_ij(1,theta_1_star) = 1;
+        else
+            A_ij(1,n_measurements+1) = 1;
+        end
+    elseif tau == 2
+        if theta_1_star ~= 0
+            A_ij(1,theta_1_star) = 1;
+        else
+            A_ij(1,n_measurements+1) = 1;
+        end
+        if theta_2_star ~= 0
+            A_ij(2,theta_2_star) = 1;
+        else
+            A_ij(2,n_measurements+2) = 1;
+        end
+    elseif tau == 3
+        if theta_1_star ~= 0
+            A_ij(1,theta_1_star) = 1;
+        else
+            A_ij(1,n_measurements+1) = 1;
+        end
+        if theta_2_star ~= 0
+            A_ij(2,theta_2_star) = 1;
+        else
+            A_ij(2,n_measurements+2) = 1;
+        end
+        if theta_3_star ~= 0
+            A_ij(3,theta_3_star) = 1;
+        else
+            A_ij(3,n_measurements+3) = 1;
+        end
     end
 
-    if theta_2_star ~= 0
-        A_ij(2,theta_2_star) = 1;
-    else
-        A_ij(2,n_measurements+2) = 1;
-    end
 
     %% Step 4 Return the measurement obtained from the association matrix
     z_hat = zeros(size(tau, 2), size(z, 2));
