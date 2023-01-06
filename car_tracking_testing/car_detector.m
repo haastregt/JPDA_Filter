@@ -7,7 +7,7 @@ function The_Box = car_detector(frame, Object)
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
     %Morphological Operation to Remove Noise
-    Structure = strel('square', 3);
+    Structure = strel('disk', 3);
     Noise_Free_Object = imopen(Object, Structure);
 
 

@@ -1,4 +1,4 @@
-function [nu_bar, beta, beta_auxillary] = associate(z, mu_bar,sigma_bar)
+function [nu_bar, beta, beta_auxillary, z_nc] = associate(z, mu_bar,sigma_bar)
     % This function performs the JPDA association
     % Inputs:
     %       z               dimMeasurementsXn_measurements      | measurements for each target
@@ -27,7 +27,14 @@ function [nu_bar, beta, beta_auxillary] = associate(z, mu_bar,sigma_bar)
             nu_bar(:,j,t) = z(:,j) - z_hat;
             S_bar = H*sigma_bar(:,:,t)*H' + Q;
             d = nu_bar(:,j,t)'/S_bar*nu_bar(:,j,t);
-            p_association(t,j) = 1/((2*pi)^(size(z,1)/2)*sqrt(det(S_bar)))*exp(-0.5*d);
+            % Measurement validation
+            if d < 40
+                p_association(t,j) = 1/((2*pi)^(size(z,1)/2)*sqrt(det(S_bar)))*exp(-0.5*d);
+            end
+        end
+        % normalise the likelihoods to detection probability
+        if (sum(p_association(t,:)) > 0)
+            p_association(t,:) = P_D*p_association(t,:)/sum(p_association(t,:));
         end
     end
 
@@ -63,5 +70,10 @@ function [nu_bar, beta, beta_auxillary] = associate(z, mu_bar,sigma_bar)
         % Probability that object t was not detected
         beta_auxillary(t) = 1 - sum(beta(t,:));
     end
+    
+    % Heuristic to find measurements that did not reach association treshold
+    % When sum of probability of all individual associations of a
+    % measurement is arbitrarily unlikely
+    z_nc = z(:,sum(beta,1) < 0.1);
 end
 

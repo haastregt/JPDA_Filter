@@ -19,7 +19,10 @@ function [theta] = find_legal_association_events(n_measurements,tau)
         permutations = reshape(combinations(:,perms(1:tau)),[],tau);
         theta = [theta, permutations'];
     end
-
+    
+    if n_measurements == 1
+        theta = [theta, zeros(tau,1)];
+    end
     % Remove duplicates
     theta = unique(theta',"rows")';
 end

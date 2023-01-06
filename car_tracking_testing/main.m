@@ -5,10 +5,10 @@ clear all; clc;
 
 % Load video
 Video = VideoReader('videoplayback_short.mp4');
-% Video = VideoReader('car2.mp4');
+%Video = VideoReader('car2.mp4');
 
 Object_Detector = vision.ForegroundDetector(...
-       'NumTrainingFrames', 7, ... 
+       'NumTrainingFrames', 50, ... 
        'InitialVariance', 30*30);
 
 % Read the first 25 frames to get the background
