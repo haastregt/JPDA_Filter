@@ -28,7 +28,7 @@ function [nu_bar, beta, beta_auxillary, z_nc] = associate(z, mu_bar,sigma_bar)
             S_bar = H*sigma_bar(:,:,t)*H' + Q;
             d = nu_bar(:,j,t)'/S_bar*nu_bar(:,j,t);
             % Measurement validation
-            if d < 40
+            if d < 50
                 p_association(t,j) = 1/((2*pi)^(size(z,1)/2)*sqrt(det(S_bar)))*exp(-0.5*d);
             end
         end
@@ -74,6 +74,6 @@ function [nu_bar, beta, beta_auxillary, z_nc] = associate(z, mu_bar,sigma_bar)
     % Heuristic to find measurements that did not reach association treshold
     % When sum of probability of all individual associations of a
     % measurement is arbitrarily unlikely
-    z_nc = z(:,sum(beta,1) < 0.1);
+    z_nc = z(:,sum(beta,1) < 0.01);
 end
 

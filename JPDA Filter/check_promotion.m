@@ -13,7 +13,7 @@ function [promote, purge, tracker] = check_promotion(beta_auxillary, tracker)
 
     tracker(1:(end-1),:) = tracker(2:end,:);
     % Give a hit if probability of misdetection is bigger than probability of detection
-    tracker(end,:) = beta_auxillary > 0.9; 
+    tracker(end,:) = beta_auxillary > 0.5; 
     % Total hits in past n times
     M = sum(tracker(2:end,:),1);
 

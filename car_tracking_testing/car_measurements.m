@@ -1,22 +1,24 @@
 function [z, delta_t, bboxes] = car_measurements(video, frame_range)
   
-    foregroundDetector = vision.ForegroundDetector('NumGaussians', 3, ...
+    foregroundDetector = vision.ForegroundDetector('NumGaussians', 2, ...
         'NumTrainingFrames', 100);
     blobAnalysis = vision.BlobAnalysis('BoundingBoxOutputPort', true, ...
         'AreaOutputPort', false, 'CentroidOutputPort', true, ...
-        'MinimumBlobArea', 200);
+        'MinimumBlobArea', 1000);
     
     % Pre-allocate
-    z = cell(video.NumFrames,1);
-    bboxes = cell(video.NumFrames,1);
-    
+       
     if nargin < 2
         frame_range = [1, video.NumFrames];
+        z = cell(video.NumFrames,1);
+        bboxes = cell(video.NumFrames,1);
     else
-        video.CurrentTime = frame_range/video.FrameRate;
+        video.CurrentTime = frame_range(1)/video.FrameRate;
+        z = cell(frame_range(2)-frame_range(1),1);
+        bboxes = cell(frame_range(2)-frame_range(1),1);
     end
     
-    for i = frame_range(1):frame_range(2)
+    for i = (frame_range(1)+1):frame_range(2)
         % Read the next video frame
         frame = readFrame(video);
         % Retrieve Foreground

@@ -20,11 +20,11 @@ function [mu, sigma] = update(mu_bar, sigma_bar, beta, beta_auxillary, nu_bar)
     sigma = zeros(size(sigma_bar));
 
     for t = 1:tau
-        nu_total = zeros(size(mu_bar,1),1);
+        nu_total = zeros(size(nu_bar,1),1);
         for j = 1:n_measurements
             nu_total = nu_total + beta(t,j)*nu_bar(:,j,t);
         end
-        K = sigma_bar(:,:,t)*H/(H*sigma_bar(:,:,t)*H' + Q);
+        K = sigma_bar(:,:,t)*H'/(H*sigma_bar(:,:,t)*H' + Q);
 
         mu(:,t) = mu_bar(:,t) + K*nu_total;
         
