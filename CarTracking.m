@@ -8,7 +8,7 @@ global delta_t
 [z, delta_t, bboxes] = car_measurements(video,[0,450]);
 n_timesteps = length(z);
 
-%%
+%% Parameters
 global F            % F matrix of dynamical model
 global G            % G matrix of dynamical model
 global H            % H matrix of measurement model
@@ -17,7 +17,6 @@ global Q            % Covariance matrix of measurement model | dimStates X dimSt
 global tau          % Number of targets
 global P_D          % Probability of a detection
 global P_FA         % Probability of a false alarm
-global map_size     % size for the map, centered around the origin | scalar
 
 % Variables for N/M heuristic
 global N            % How many samples to take before evaluation
@@ -26,9 +25,14 @@ global M_D          % Treshold for demotion
 global DeltaMax     % Max distance between first and second measurement for track birth
 
 %% Initialize video
-saveVideo = VideoWriter('CarTrackingResults'); %open video file
-saveVideo.FrameRate = 10;  %can adjust this, 5 - 10 works well for me
-open(saveVideo)
+createVid = false;
+
+if createVid
+    saveVideo = VideoWriter('CarTrackingResults'); %open video file
+    saveVideo.FrameRate = 25;
+    open(saveVideo)
+end
+
 % Number of targets
 tau = 0; % Start with 0 tracked objects. Don't change this!
 
@@ -44,9 +48,10 @@ H = eye(n_meas, n_states);
 
 % Set values for JPDA parameters
 R = 50*eye(n_states); % Take into account our states are in pixels
+R(1:2,1:2) = 0.2*R(1:2,1:2);
 Q = 200*eye(n_meas);
 P_D = 0.8;
-P_FA = 0.8;
+P_FA = 0.5;
 
 % Set values for M/N heuristic
 N = 8;
@@ -70,10 +75,9 @@ video.CurrentTime = 0;
 
 figure('units','normalized','outerposition',[0 0 1 1])
 for timestep = 1:n_timesteps
+    disp("Frame Number: " + timestep)
     % Do an iteration of JPDA Filter for confirmed tracks
     tau = size(mu,2);
-    disp("Number of targets: " + tau)
-    disp("Number of measurements: " + size(z{timestep},2))
 
     u = zeros(n_inp,tau);
     [mu, sigma, ~, beta_auxillary, z_nc] = iterate(mu, sigma, u, z{timestep});
@@ -138,16 +142,20 @@ for timestep = 1:n_timesteps
     ylim([0, 1080])
 
     if ~isempty(mu)
-        frame = insertText(frame, mu(1:2,:)', text_str, 'FontSize',18,'BoxColor',...
+        frame = insertText(frame, mu(1:2,:)', text_str, 'FontSize',36,'BoxColor',...
             'yellow','BoxOpacity',0.8,'TextColor','black');
         image(frame)
     else
         image(frame)
     end
     
+    if ~isempty(z{timestep})
+        z_plot = scatter(z{timestep}(1,:), z{timestep}(2,:),200,'.','green');
+    end
+
     
     if ~isempty(mu)
-        mu_plot = scatter(mu(1,:), mu(2,:),100,'x','red');
+        mu_plot = scatter(mu(1,:), mu(2,:),200,'x','red');
 
         XData = zeros(100,tau);
         YData = zeros(100,tau);
@@ -157,15 +165,19 @@ for timestep = 1:n_timesteps
         plot(XData,YData,'LineWidth',2,'Color',[1, 0, 0])
     end
     if ~isempty(mu_tentative)
-        mu_plot = scatter(mu_tentative(1,:), mu_tentative(2,:),100,'x','blue');
+        mu_plot = scatter(mu_tentative(1,:), mu_tentative(2,:),200,'x','magenta');
     end
     if ~isempty(mu_new)
-        mu_plot = scatter(mu_new(1,:), mu_new(2,:),100,'x','black');
+        mu_plot = scatter(mu_new(1,:), mu_new(2,:),200,'x','cyan');
     end
     drawnow
-
-    frame = getframe(gcf); %get frame
-    writeVideo(saveVideo, frame);
+    
+    if createVid
+        frame = getframe(gcf); %get frame
+        writeVideo(saveVideo, frame);
+    end
 end
 
-close(saveVideo)
+if createVid
+    close(saveVideo)
+end

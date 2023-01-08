@@ -12,8 +12,9 @@ function [z, association_ground_truth] = simulate_measurements(ground_truth)
         detected = false;
         while ~detected
             if rand(1) < P_FA
-                % False detections are simulated to be uniformly distributed within the map bounds
-                false_detection = map_size*(rand(size(H,1),1)-0.5);
+                % Clutter can come from targets as well, just with higher
+                % variance
+                false_detection = mvnrnd(ground_truth(:,t),20*Q)';
                 z = [z, false_detection];
                 association_ground_truth = [association_ground_truth, 0];
             else

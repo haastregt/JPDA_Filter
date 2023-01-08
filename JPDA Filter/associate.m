@@ -74,6 +74,6 @@ function [nu_bar, beta, beta_auxillary, z_nc] = associate(z, mu_bar,sigma_bar)
     % Heuristic to find measurements that did not reach association treshold
     % When sum of probability of all individual associations of a
     % measurement is arbitrarily unlikely
-    z_nc = z(:,sum(beta,1) < 0.01);
+    z_nc = z(:,sum(beta,1) < 0.1);
 end
 

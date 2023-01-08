@@ -10,7 +10,7 @@ function [z_hat, invalid] = gnn_associate(z, mu_bar,sigma_bar)
     % Number of available measurements
     n_measurements = size(z,2);
     % gate_threshold = chi2inv(0.99,2); % Threshold for the Mahalanobis distance
-    gate_threshold = 5; % [m] % TODO: This is a temporary value that is used just for debugging purposes
+    gate_threshold = 50; % [m] % TODO: This is a temporary value that is used just for debugging purposes
     invalid = 0;    % Flag to indicate if there are any valid associations by the end of this function
 
     %% Step 1: Compute cost matrix L_ij (i = 1,2,...,targets; j = 1,2,...,measurements)
